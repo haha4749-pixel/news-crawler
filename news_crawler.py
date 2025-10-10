@@ -85,81 +85,9 @@ def remove_duplicates(news_list):
 def connect_sheet(sheet_name):
     # GitHub Secrets에서 JSON 가져오기
     creds_json = os.environ.get('GOOGLE_CREDENTIALS')
-    if creds_json:
-        creds_dict = json.loads(creds_json)
-    else:
-        # 로컬 테스트용
-        from oauth2client.service_account import ServiceAccountCredentials
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-        client = gspread.authorize(creds)
-        sheet = client.open_by_key(SPREADSHEET_ID)
-        try:
-            worksheet = sheet.worksheet(sheet_name)
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = sheet.add_worksheet(title=sheet_name, rows="1000", cols="5")
-            worksheet.append_row(["날짜", "시간", "요약", "링크", "해시값"])
-        return worksheet
+    if not creds_json:
+        raise Exception("GOOGLE_CREDENTIALS 환경변수가 설정되지 않았습니다")
     
+    creds_dict = json.loads(creds_json)
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SPREADSHEET_ID)
-    try:
-        worksheet = sheet.worksheet(sheet_name)
-    except gspread.exceptions.WorksheetNotFound:
-        worksheet = sheet.add_worksheet(title=sheet_name, rows="1000", cols="5")
-        worksheet.append_row(["날짜", "시간", "요약", "링크", "해시값"])
-    return worksheet
-
-# ✅ 저장 + Webhook 전송
-def save_to_sheet(news_list):
-    if not news_list:
-        print("[INFO] 저장할 뉴스 없음")
-        return
-    today = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d")
-    ws = connect_sheet(today)
-    existing_hashes = set(ws.col_values(5)[1:])
-    new_rows = []
-    new_items = []
-    for n in news_list:
-        if n["hash"] in existing_hashes:
-            continue
-        new_rows.append([n["date"], n["time"], n["summary"], n["link"], n["hash"]])
-        new_items.append({
-            "날짜": n["date"],
-            "시간": n["time"],
-            "요약": n["summary"],
-            "링크": n["link"]
-        })
-    if new_rows:
-        ws.append_rows(new_rows)
-        print(f"[INFO] 총 {len(new_rows)}건 시트에 저장 완료됨")
-        send_to_webhook(new_items)
-    else:
-        print("[INFO] 모든 뉴스가 이미 존재함")
-
-# ✅ Webhook 전송
-def send_to_webhook(items):
-    if not items:
-        return
-    try:
-        response = requests.post(WEBHOOK_URL, json={"news": items})
-        if response.status_code == 200:
-            print(f"[INFO] Webhook으로 {len(items)}건 전송 완료됨")
-        else:
-            print(f"[ERROR] Webhook 전송 실패: {response.status_code}")
-    except Exception as e:
-        print(f"[ERROR] Webhook 전송 예외 발생: {e}")
-
-# ✅ 메인 실행
-if __name__ == "__main__":
-    print(f"[INFO] 뉴스 수집 시작: {datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')}")
-    try:
-        news = fetch_news()
-        deduped = remove_duplicates(news)
-        save_to_sheet(deduped)
-        print("[INFO] 뉴스 수집 완료!")
-    except Exception as e:
-        print(f"[ERROR] 실행 실패: {e}")
-        raise
+    creds = ServiceAccountCredent
